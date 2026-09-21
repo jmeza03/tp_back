@@ -8,7 +8,6 @@ load_dotenv(Path(__file__).parent / ".env")
 
 
 def get_connection():
-    """Abre y devuelve una conexión a MySQL."""
     return mysql.connector.connect(
         host=os.getenv("DB_HOST"),
         user=os.getenv("DB_USER"),
@@ -18,7 +17,6 @@ def get_connection():
 
 
 def query_all(sql, params=None):
-    """Ejecuta un SELECT y devuelve todas las filas como lista de dicts."""
     conn = get_connection()
     try:
         cur = conn.cursor(dictionary=True)
@@ -29,7 +27,6 @@ def query_all(sql, params=None):
 
 
 def query_one(sql, params=None):
-    """Ejecuta un SELECT y devuelve una fila (dict) o None."""
     conn = get_connection()
     try:
         cur = conn.cursor(dictionary=True)
@@ -40,7 +37,6 @@ def query_one(sql, params=None):
 
 
 def execute(sql, params=None):
-    """Ejecuta INSERT/UPDATE/DELETE. Devuelve lastrowid o rowcount."""
     conn = get_connection()
     try:
         cur = conn.cursor()

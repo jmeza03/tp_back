@@ -6,7 +6,14 @@ socios_bp = Blueprint("socios", __name__)
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 def  _error(estado, mensaje):
-    return jsonify({ "error": mensaje}), estado
+    return jsonify({
+        "errors": [{
+            "code": "ERROR_VALIDACION",
+            "message": mensaje,
+            "level": "error",
+            "description": mensaje,
+        }]
+    }),  estado
 
 def _fila_a_json(fila):
     return {
@@ -63,8 +70,9 @@ def listar():
         consulta = dict(request.args.to_dict())
         consulta["_limit"] = limite
         consulta["_offset"] = nuevo_desplazamiento
-        return f"{url_base}?" + "&".join(f"{k}={v}" for k, v in consulta.items())
-
+        url = f"{url_base}?" + "&".join(f"{k}={v}" for k, v in consulta.items())
+        return {"href": url}
+        
     ultimo_desplazamiento = (
         max(0,((total - 1) // limite )* limite) if total > 0 else 0
     )
@@ -75,7 +83,7 @@ def listar():
         "_next": _link(desplazamiento + limite) if desplazamiento + limite < total else None,
         "_last": _link(ultimo_desplazamiento) 
     }
-    return jsonify({"total": total, "socios": socios, "_links": enlaces}), 200
+    return jsonify({ "socios": socios, "_links": enlaces}), 200
 
 
 # POST /socios
