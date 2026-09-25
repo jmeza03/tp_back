@@ -27,7 +27,7 @@ def validar_transicion(estado_actual, estado_nuevo, inicio, fin, ahora):
 
 def obtener_estado_reserva(id_reserva):
     sql = """
-        SELECT id, estado, fecha_hora_inicio, fecha_hora_fin
+        SELECT *
         FROM reservas
         WHERE id = %s
         """
@@ -35,6 +35,19 @@ def obtener_estado_reserva(id_reserva):
     reserva = query_one(sql,(id_reserva,))
     #se guardan los datos de la reserva en un diccionario, sino devuelve none "flechita hacia arriba"
     return reserva
+
+def preparar_reserva(reserva):
+    datos = reserva.copy()
+
+    datos["fecha_hora_inicio"] = datos["fecha_hora_inicio"].replace(
+        tzinfo=ZONA_CLUB
+    ).isoformat()
+
+    datos["fecha_hora_fin"] = datos["fecha_hora_fin"].replace(
+        tzinfo=ZONA_CLUB
+    ).isoformat()
+
+    return datos
 
 def cambiar_estado_reserva(id_reserva, estado_nuevo):
 
@@ -79,7 +92,8 @@ def cambiar_estado_reserva(id_reserva, estado_nuevo):
 
     if estado_actual == estado_nuevo:
         return {
-            "mensaje": "la reserva ya tiene ese estado"
+        "mensaje": "la reserva ya tiene ese estado",
+        "reserva": preparar_reserva(reserva)
         }
 
     sql = """
@@ -87,9 +101,13 @@ def cambiar_estado_reserva(id_reserva, estado_nuevo):
         SET estado = %s
         WHERE id = %s
     """
-
     execute(sql, (estado_nuevo, id_reserva))
 
+    reserva_actualizada = obtener_estado_reserva(id_reserva)
+
+    datos_reserva = preparar_reserva(reserva_actualizada)
+
     return {
-        "mensaje": f"Estado de reserva actualizado correctamente"
-        }
+        "mensaje": "Estado de reserva actualizado correctamente",
+        "reserva": datos_reserva
+    }
