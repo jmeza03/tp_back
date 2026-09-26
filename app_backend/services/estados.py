@@ -99,9 +99,24 @@ def cambiar_estado_reserva(id_reserva, estado_nuevo):
     sql = """
         UPDATE reservas
         SET estado = %s
-        WHERE id = %s
+        WHERE id = %s AND estado = %s
     """
-    execute(sql, (estado_nuevo, id_reserva))
+    filas_actualizadas = execute(
+        sql,
+        (estado_nuevo, id_reserva, estado_actual)
+    )
+
+    if filas_actualizadas == 0:
+        reserva_actual = obtener_estado_reserva(id_reserva)
+        if reserva_actual["estado"] == estado_nuevo:
+            return {
+                "mensaje": "la reserva ya tiene ese estado",
+                "reserva": preparar_reserva(reserva_actual)
+            }
+        
+        return {
+            "error": "la transicion de estado no esta permitida"
+        }
 
     reserva_actualizada = obtener_estado_reserva(id_reserva)
 
