@@ -2,6 +2,8 @@ import re
 from flask import Blueprint,request, jsonify
 from db import execute, query_all, query_one
 
+from app_backend.constants import PAGINACION_LIMIT_POR_DEFECTO, PAGINACION_LIMIT_MAXIMO
+
 socios_bp = Blueprint("socios", __name__)
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
