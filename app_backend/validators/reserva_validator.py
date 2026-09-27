@@ -1,6 +1,7 @@
 from datetime import datetime
 # constantes de negocio definidas constants.py
-from app_backend.constants import (
+# Usa las reglas generales de reservas definidas en constants.py
+from constants import (
     ZONA_HORARIA_CLUB,
     HORA_APERTURA_CLUB,
     HORA_CIERRE_CLUB,
