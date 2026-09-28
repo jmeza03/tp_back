@@ -1,4 +1,5 @@
-from ..db import query_one,query_all,execute
+# Usa las funciones de acceso a la base de datos definidas en db.py
+from db import query_one, query_all, execute
 from datetime import datetime
 def obtener_reservas(limit,offset,canchas_id, socio_id, estado_arg,fecha_desde,fecha_hasta):
     sql = "SELECT * FROM reservas WHERE 1=1 "
@@ -45,11 +46,30 @@ def comparador(sql, parametros, condicion, valor):
 
 
 def agregar_reserva(datos):
-    sql = "INSERT INTO reservas (id_socio, id_cancha, fecha_hora_inicio, fecha_hora_fin, precio_hora, precio_total) values(%s, %s, %s, %s, %s, %s)" 
+    # Inserta la reserva usando los nombres de columnas actuales de la base.
+    # Luego habrá que ajustar estos campos si el contrato exige otros nombres o formato.
+    sql = """
+        INSERT INTO reservas
+        (id_socio, id_cancha, fecha_hora_inicio, fecha_hora_fin, tarifa_hora, total)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """
+
     precio_hora = precio_hora_cancha(datos["id_cancha"])
-    precio_total = precio_hora * precio_xhora(datos["fecha_hora_inicio"],datos["fecha_hora_fin"])
-    parametros = [datos["id_socio"],datos["id_cancha"],datos["fecha_hora_inicio"],datos["fecha_hora_fin"],precio_hora,precio_total]
-    execute(sql,parametros)
+    precio_total = precio_hora * precio_xhora(
+        datos["fecha_hora_inicio"],
+        datos["fecha_hora_fin"]
+    )
+
+    parametros = [
+        datos["id_socio"],
+        datos["id_cancha"],
+        datos["fecha_hora_inicio"],
+        datos["fecha_hora_fin"],
+        precio_hora,
+        precio_total
+    ]
+
+    execute(sql, parametros)
 
 def precio_hora_cancha(id_cancha): #conseguir el precio x hora de la cancha por el id
     sql = "SELECT precio_hora FROM canchas WHERE id = %s"

@@ -1,7 +1,7 @@
 from flask import Blueprint,jsonify, request
-#from ..validators.reservas import validar_id,validar_datos_reserva,validar_estado,validar_datos
-from ..servicies.reservas import registar_reserva,actualizar_estado_reserva,listar_reservas,listar_reserva_id
-from ..repositories.reservas import contador_reservas
+# Importa la logica de reservas desde los modulos locales
+from services.reservas import registar_reserva, actualizar_estado_reserva, listar_reservas, listar_reserva_id
+from repositories.reservas import contador_reservas
 reservas_bp=Blueprint('reservas',__name__)
 
 @reservas_bp.route('/reservas', methods=['GET'])

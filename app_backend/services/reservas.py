@@ -1,5 +1,7 @@
-
-from ..repositories.reservas import obtener_reservas,obtener_reserva_id,agregar_reserva,actualizar_estado,hay_superposicion_reserva
+from datetime import datetime
+from validators.reserva_validator import validar_nueva_reserva
+# Importa las consultas de reservas desde repositories
+from repositories.reservas import obtener_reservas, obtener_reserva_id, agregar_reserva, actualizar_estado, hay_superposicion_reserva
 #from ..repositories.socios import obtener_socio_id
 #from ..repositories.canchas import obtener_cancha_id
 from flask import jsonify
@@ -17,15 +19,24 @@ def listar_reserva_id(reserva_id):
     return reserva_dict
 
 def registar_reserva(datos_reserva):
-    # en caso de que socio y cancha no existan
-  # socio_id =  obtener_socio_id(datos_reserva["id_socio"]) --> repositories/socios 
-  # cancha_id = obtener_cancha_id(datos_reserva["id_cancha"]) --> repositories/canchas
- 
+    # Convierte las fechas recibidas como texto a objetos datetime
+    fecha_inicio = datetime.fromisoformat(datos_reserva["fecha_hora_inicio"])
+    fecha_fin = datetime.fromisoformat(datos_reserva["fecha_hora_fin"])
+
+    # Valida fecha, horario y duración de la reserva
+    valida, mensaje = validar_nueva_reserva(fecha_inicio, fecha_fin)
+
+    if not valida:
+        return jsonify({"error": mensaje}), 400
+
+    # Verifica que no exista otra reserva en el mismo horario
     superposicion = hay_superposicion_reserva(datos_reserva)
+
     if superposicion:
-        return jsonify({"error": "Ya existe reserva entre esas horas"}),409 
-    agregar_reserva(datos_reserva) 
-    return '',201
+        return jsonify({"error": "Ya existe reserva entre esas horas"}), 409
+
+    agregar_reserva(datos_reserva)
+    return '', 201
 
 
 def actualizar_estado_reserva(id: int,estado):

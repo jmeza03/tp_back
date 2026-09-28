@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from db import fetch_all, fetch_one, execute_query
+from db import query_all, query_one, execute
 from datetime import datetime
 
 canchas_bp = Blueprint('canchas', __name__)
@@ -43,7 +43,7 @@ def listar_canchas():
     sql += " ORDER BY id ASC LIMIT %s OFFSET %s"
     params.extend([limit, offset]) #.extend: sumo lista 
 
-    canchas_obtenidas = fetch_all(sql, params)
+    canchas_obtenidas = query_all(sql, params)
     prev_offset = max(0, offset - limit)
     #Canchas: muestra las canchas que filtrò, links: lista de la pagina
     respuesta = {
@@ -77,7 +77,7 @@ def crear_cancha():
     if not isinstance(precio_hora, int) or precio_hora <= 0:
         return jsonify({"error": "El precio por hora debe ser un número entero positivo"}), 400
 
-    deporte_existente = fetch_one("SELECT id FROM deportes WHERE id = %s", [id_deporte])
+    deporte_existente = query_one("SELECT id FROM deportes WHERE id = %s", [id_deporte])
     if not deporte_existente:
         return jsonify({"error": "El deporte especificado no existe"}), 400
 
@@ -92,9 +92,9 @@ def crear_cancha():
     #Valores %s
     params = [nombre_limpio, id_deporte, precio_hora, techada, activa]
 
-    cancha_id = execute_query(sql, params) #Se realiza la consulta
+    cancha_id = execute(sql, params) #Se realiza la consulta
 
-    nueva_cancha = fetch_one("SELECT * FROM canchas WHERE id = %s", [cancha_id])
+    nueva_cancha = query_one("SELECT * FROM canchas WHERE id = %s", [cancha_id])
 
     return jsonify(nueva_cancha), 201
 
@@ -103,7 +103,7 @@ def crear_cancha():
 def obtener_cancha_por_id(cancha_id):
     #Recibe y consulta tabla
     sql = "SELECT id, nombre, id_deporte, precio_hora, techada, activa FROM canchas WHERE id = %s"
-    cancha = fetch_one(sql, [cancha_id])
+    cancha = query_one(sql, [cancha_id])
 
     #Si no existe, error
     if not cancha:
@@ -116,7 +116,7 @@ def obtener_cancha_por_id(cancha_id):
 def actualizar_cancha(cancha_id):
     #Recibe id
 
-    cancha_existente = fetch_one("SELECT * FROM canchas WHERE id = %s", [cancha_id])
+    cancha_existente = query_one("SELECT * FROM canchas WHERE id = %s", [cancha_id])
     if not cancha_existente:
         return jsonify({"error": "La cancha solicitada no existe"}), 404
 
@@ -158,9 +158,9 @@ def actualizar_cancha(cancha_id):
     params.append(cancha_id)
 
    
-    execute_query(sql, params) #Ejecuto actualizacion
+    execute(sql, params) #Ejecuto actualizacion
 
-    cancha_actualizada = fetch_one("SELECT * FROM canchas WHERE id = %s", [cancha_id])
+    cancha_actualizada = query_one("SELECT * FROM canchas WHERE id = %s", [cancha_id])
 
     return jsonify(cancha_actualizada), 200
 
@@ -169,20 +169,20 @@ def actualizar_cancha(cancha_id):
 def eliminar_cancha(cancha_id):
    #Recibe id
 
-    cancha = fetch_one("SELECT id FROM canchas WHERE id = %s", [cancha_id])
+    cancha = query_one("SELECT id FROM canchas WHERE id = %s", [cancha_id])
 
     #Si cancha no existe
     if not cancha:
         return jsonify({"error": "La cancha solicitada no existe"}), 404
 
     #Verifica si esta reservado
-    reserva_existente = fetch_one("SELECT id FROM reservas WHERE id_cancha = %s", [cancha_id])
+    reserva_existente = query_one("SELECT id FROM reservas WHERE id_cancha = %s", [cancha_id])
     
     if reserva_existente:
         return jsonify({"error": "No se puede eliminar la cancha porque tiene reservas asociadas. Podra desactivarse mediante PATCH."}), 409
     
     #Si no esta reservada y existe cancha
-    execute_query("DELETE FROM canchas WHERE id = %s", [cancha_id])
+    execute("DELETE FROM canchas WHERE id = %s", [cancha_id])
     
     return '', 204
 
@@ -241,7 +241,7 @@ def obtener_canchas_disponibles():
     sql += " ORDER BY id ASC LIMIT %s OFFSET %s"
     params.extend([limit, offset])
 
-    canchas_libres = fetch_all(sql, params)
+    canchas_libres = query_all(sql, params)
     prev_offset = max(0, offset - limit)
 
     respuesta = {
