@@ -1,6 +1,6 @@
 from flask import Blueprint,jsonify, request
 # Importa la logica de reservas desde los modulos locales
-from services.reservas import registar_reserva, actualizar_estado_reserva, listar_reservas, listar_reserva_id
+from services.reservas import registar_reserva, listar_reservas, listar_reserva_id
 from repositories.reservas import contador_reservas
 reservas_bp=Blueprint('reservas',__name__)
 
@@ -57,11 +57,3 @@ def agregar_reserva():
     #validar_campo_oblicatorio(datos_reserva) --> desde validators valida si los campos estan
 
     return registar_reserva(datos_reserva)
-
-@reservas_bp.route('/reservas/<id>/estado', methods = ['PUT'])
-def actualizar_estado(id):
-    estado = request.get_json()
-    #validar_id(id)
-    #validar_estado(estado) --> validaciones
-
-    return actualizar_estado_reserva(id,estado)
