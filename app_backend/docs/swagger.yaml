@@ -1,0 +1,621 @@
+openapi: 3.0.0
+info:
+  title: API de Reservas de Club Deportivo
+  description: >-
+    Documentación de las operaciones de Deportes, Canchas y Socios disponibles
+    en la rama main del repositorio. Las respuestas reflejan el comportamiento
+    actual de sus rutas.
+  version: 1.0.0
+servers:
+  - url: /
+    description: Servidor local de desarrollo
+tags:
+  - name: Deportes
+    description: Deportes precargados
+  - name: Canchas
+    description: Gestión y disponibilidad de canchas
+  - name: Socios
+    description: Gestión de socios del club
+
+paths:
+  /deportes:
+    get:
+      summary: Listar deportes precargados
+      tags: [Deportes]
+      responses:
+        '200':
+          description: Listado de deportes (puede estar vacío).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeportesListResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /canchas:
+    get:
+      summary: Listar canchas
+      description: >-
+        Devuelve las canchas paginadas; sin filtros incluye canchas activas e
+        inactivas. Los filtros se combinan y nombre admite búsqueda parcial sin
+        distinguir mayúsculas y minúsculas. Se rechazan parámetros desconocidos.
+      tags: [Canchas]
+      parameters:
+        - $ref: '#/components/parameters/IdDeporteFilter'
+        - $ref: '#/components/parameters/NombreFilter'
+        - $ref: '#/components/parameters/TechadaFilter'
+        - $ref: '#/components/parameters/ActivaFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Página de canchas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanchasListResponse'
+        '400':
+          $ref: '#/components/responses/CanchaBadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Crear una cancha
+      tags: [Canchas]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanchaCreate'
+      responses:
+        '201':
+          description: Cancha creada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cancha'
+        '400':
+          $ref: '#/components/responses/CanchaBadRequest'
+        '404':
+          $ref: '#/components/responses/CanchaNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /canchas/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      summary: Obtener una cancha por ID
+      tags: [Canchas]
+      responses:
+        '200':
+          description: Cancha encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cancha'
+        '404':
+          $ref: '#/components/responses/CanchaNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      summary: Actualizar parcialmente una cancha
+      tags: [Canchas]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanchaUpdate'
+      responses:
+        '200':
+          description: Cancha actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cancha'
+        '400':
+          $ref: '#/components/responses/CanchaBadRequest'
+        '404':
+          $ref: '#/components/responses/CanchaNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Eliminar una cancha
+      description: >-
+        Solo se elimina si no tiene reservas asociadas. Si tiene reservas, se
+        devuelve un conflicto y puede desactivarse mediante PATCH.
+      tags: [Canchas]
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        '404':
+          $ref: '#/components/responses/CanchaNotFound'
+        '409':
+          $ref: '#/components/responses/CanchaConflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /canchas/disponibles:
+    get:
+      summary: Consultar canchas disponibles en un intervalo
+      description: >-
+        Devuelve canchas activas sin reservas confirmadas superpuestas durante
+        el intervalo indicado. fecha usa YYYY-MM-DD y las horas usan HH:MM. La
+        ruta valida el formato y que hora_inicio sea anterior a hora_fin; no
+        valida que el intervalo sea futuro, dure de una a tres horas, use horas
+        en punto o quede dentro del horario 08:00–23:00. Se rechazan parámetros
+        desconocidos. La consulta no crea una reserva.
+      tags: [Canchas]
+      parameters:
+        - $ref: '#/components/parameters/FechaRequired'
+        - $ref: '#/components/parameters/HoraInicioRequired'
+        - $ref: '#/components/parameters/HoraFinRequired'
+        - $ref: '#/components/parameters/IdDeporteFilter'
+        - $ref: '#/components/parameters/TechadaFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Página de canchas disponibles, incluso si no hay resultados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanchasListResponse'
+        '400':
+          $ref: '#/components/responses/CanchaBadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /socios:
+    get:
+      summary: Listar socios
+      description: >-
+        Devuelve los socios paginados. nombre admite búsqueda parcial sin
+        distinguir mayúsculas y minúsculas; activo permite filtrar por estado.
+        Se rechazan parámetros desconocidos.
+      tags: [Socios]
+      parameters:
+        - $ref: '#/components/parameters/NombreFilter'
+        - $ref: '#/components/parameters/ActivoFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Página de socios.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SociosListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Crear un socio
+      description: >-
+        Se quitan los espacios de los extremos de nombre y email, el email se
+        guarda en minúsculas y activo se inicializa en true. Un email existente,
+        incluso el de un socio inactivo, produce 409.
+      tags: [Socios]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SocioCreate'
+      responses:
+        '201':
+          description: Socio creado; activo se inicializa en true.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Socio'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /socios/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      summary: Obtener un socio por ID
+      tags: [Socios]
+      responses:
+        '200':
+          description: Socio encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Socio'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      summary: Actualizar parcialmente un socio
+      tags: [Socios]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SocioUpdate'
+      responses:
+        '200':
+          description: Socio actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Socio'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    Deporte:
+      type: object
+      required: [id, nombre]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          example: 1
+        nombre:
+          type: string
+          maxLength: 100
+          example: Fútbol
+
+    DeportesListResponse:
+      type: object
+      required: [deportes]
+      properties:
+        deportes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Deporte'
+
+    Cancha:
+      type: object
+      required: [id, nombre, id_deporte, precio_hora, techada, activa]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          example: 1
+        nombre:
+          type: string
+          maxLength: 100
+          example: Cancha 1 - Fútbol 5
+        id_deporte:
+          type: integer
+          minimum: 1
+          example: 1
+        precio_hora:
+          type: integer
+          minimum: 1
+          description: Tarifa vigente por hora en centavos.
+          example: 1000000
+        techada:
+          type: boolean
+          example: false
+        activa:
+          type: boolean
+          example: true
+
+    CanchaCreate:
+      type: object
+      additionalProperties: false
+      required: [nombre, id_deporte, precio_hora]
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Cancha 1 - Fútbol 5
+        id_deporte:
+          type: integer
+          minimum: 1
+          example: 1
+        precio_hora:
+          type: integer
+          minimum: 1
+          example: 1000000
+        techada:
+          type: boolean
+          default: false
+        activa:
+          type: boolean
+          default: true
+
+    CanchaUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 100
+        precio_hora:
+          type: integer
+          minimum: 1
+        techada:
+          type: boolean
+        activa:
+          type: boolean
+
+    Socio:
+      type: object
+      required: [id, nombre, email, activo]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+          example: 1
+        nombre:
+          type: string
+          maxLength: 100
+          example: Juan Pérez
+        email:
+          type: string
+          format: email
+          example: juan.perez@example.com
+        activo:
+          type: boolean
+          example: true
+
+    SocioCreate:
+      type: object
+      additionalProperties: false
+      required: [nombre, email]
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Juan Pérez
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: juan.perez@example.com
+
+    SocioUpdate:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        activo:
+          type: boolean
+
+    Link:
+      type: object
+      required: [href]
+      properties:
+        href:
+          type: string
+          format: uri-reference
+
+    Links:
+      type: object
+      required: [_first, _prev, _next, _last]
+      properties:
+        _first:
+          $ref: '#/components/schemas/Link'
+        _prev:
+          type: object
+          nullable: true
+          required: [href]
+          properties:
+            href:
+              type: string
+              format: uri-reference
+        _next:
+          type: object
+          nullable: true
+          required: [href]
+          properties:
+            href:
+              type: string
+              format: uri-reference
+        _last:
+          $ref: '#/components/schemas/Link'
+
+    CanchasListResponse:
+      type: object
+      required: [canchas, _links]
+      properties:
+        canchas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cancha'
+        _links:
+          $ref: '#/components/schemas/Links'
+
+    SociosListResponse:
+      type: object
+      required: [socios, _links]
+      properties:
+        socios:
+          type: array
+          items:
+            $ref: '#/components/schemas/Socio'
+        _links:
+          $ref: '#/components/schemas/Links'
+
+    Error:
+      type: object
+      required: [code, message, level, description]
+      properties:
+        code:
+          type: string
+          example: ERROR_VALIDACION
+        message:
+          type: string
+          example: La solicitud es inválida.
+        level:
+          type: string
+          enum: [info, warning, error]
+          example: error
+        description:
+          type: string
+          example: El campo nombre es obligatorio.
+
+    Errores:
+      type: object
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error'
+
+    CanchaError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: El nombre no puede estar vacío.
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: Identificador entero positivo del recurso.
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+    Limit:
+      name: _limit
+      in: query
+      description: Máximo de registros por página.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+    Offset:
+      name: _offset
+      in: query
+      description: Cantidad de registros a omitir.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    NombreFilter:
+      name: nombre
+      in: query
+      description: Búsqueda parcial, sin distinguir mayúsculas.
+      schema:
+        type: string
+    IdDeporteFilter:
+      name: id_deporte
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+    TechadaFilter:
+      name: techada
+      in: query
+      description: Solo acepta los valores literales true o false.
+      schema:
+        type: boolean
+    ActivaFilter:
+      name: activa
+      in: query
+      description: Solo acepta los valores literales true o false.
+      schema:
+        type: boolean
+    ActivoFilter:
+      name: activo
+      in: query
+      description: Solo acepta los valores literales true o false.
+      schema:
+        type: boolean
+    FechaRequired:
+      name: fecha
+      in: query
+      required: true
+      schema:
+        type: string
+        format: date
+      example: '2026-10-15'
+    HoraInicioRequired:
+      name: hora_inicio
+      in: query
+      required: true
+      schema:
+        type: string
+        pattern: '^([0-9]|[01][0-9]|2[0-3]):[0-5][0-9]$'
+      example: '18:00'
+    HoraFinRequired:
+      name: hora_fin
+      in: query
+      required: true
+      schema:
+        type: string
+        pattern: '^([0-9]|[01][0-9]|2[0-3]):[0-5][0-9]$'
+      example: '20:00'
+
+  responses:
+    CanchaBadRequest:
+      description: Solicitud inválida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CanchaError'
+    CanchaNotFound:
+      description: Cancha o deporte no encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CanchaError'
+    CanchaConflict:
+      description: La cancha tiene reservas asociadas.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CanchaError'
+    BadRequest:
+      description: Solicitud inválida.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Errores'
+    NotFound:
+      description: Recurso no encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Errores'
+    Conflict:
+      description: Conflicto de negocio.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Errores'
+    NoContent:
+      description: Operación exitosa sin cuerpo de respuesta.
+    InternalServerError:
+      description: Error interno del servidor.
