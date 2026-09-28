@@ -86,6 +86,20 @@ def actualizar_estado(id_reserva, estado):
     return execute(sql,parametros)
 
 def hay_superposicion_reserva(datos): #ver si hay una reserva en las horas dadas
-    sql = "SELECT EXISTS ( SELECT 1 FROM reservas WHERE id_cancha = %s AND fecha_hora_inicio < %s AND fecha_hora_fin > %s) AS existe_superposicion"
-    parametros = [datos["id_cancha"],datos["fecha_hora_fin"],datos["fecha_hora_inicio"]]
-    return bool(query_one(sql,parametros)["existe_superposicion"])
+    sql = """
+    SELECT EXISTS ( 
+        SELECT 1 
+        FROM reservas 
+        WHERE estado = 'confirmada' 
+        AND (id_cancha = %s OR id_socio = %s) 
+        AND fecha_hora_inicio < %s 
+        AND fecha_hora_fin > %s
+    ) AS existe_superposicion
+    """
+    parametros = [
+        datos["id_cancha"],
+        datos["id_socio"],
+        datos["fecha_hora_fin"],
+        datos["fecha_hora_inicio"]
+    ]
+    return bool(query_one(sql, parametros)["existe_superposicion"])
