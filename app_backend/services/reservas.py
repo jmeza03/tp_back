@@ -1,16 +1,14 @@
-from datetime import datetime
-from validators.reserva_validator import validar_nueva_reserva
+from validators.reserva_validator import construir_error
+from routes.canchas import obtener_cancha_por_id
+from routes.socios import obtener
 # Importa las consultas de reservas desde repositories
-from repositories.reservas import obtener_reservas, obtener_reserva_id, agregar_reserva, actualizar_estado, hay_superposicion_reserva
-#from ..repositories.socios import obtener_socio_id
-#from ..repositories.canchas import obtener_cancha_id
-from flask import jsonify
+from repositories.reservas import obtener_reservas, obtener_reserva_id, insertar_reserva, hay_superposicion_reserva,entidad_activa
 
 def listar_reservas(limit,offset,canchas_id=None, socio_id=None, estado_arg=None,fecha_desde=None,fecha_hasta=None):
     reservas_dict = {"reservas": []}
     for i in obtener_reservas(limit,offset,canchas_id, socio_id, estado_arg,fecha_desde,fecha_hasta):
         reservas_dict["reservas"].append(i)
-    return reservas_dict # sorted(reservas_dict["reservas"], key=lambda x: x["id"]) <-- ordena por id
+    return reservas_dict 
 
 def listar_reserva_id(reserva_id):
     reserva_dict = obtener_reserva_id(reserva_id)
@@ -18,30 +16,54 @@ def listar_reserva_id(reserva_id):
         return None
     return reserva_dict
 
-def registar_reserva(datos_reserva):
-    # Convierte las fechas recibidas como texto a objetos datetime
-    fecha_inicio = datetime.fromisoformat(datos_reserva["fecha_hora_inicio"])
-    fecha_fin = datetime.fromisoformat(datos_reserva["fecha_hora_fin"])
+def registrar_reserva(datos_reserva):
 
-    # Valida fecha, horario y duración de la reserva
-    valida, mensaje = validar_nueva_reserva(fecha_inicio, fecha_fin)
 
-    if not valida:
-        return jsonify({"error": mensaje}), 400
+    # Verifica que la cancha exista
+    cancha,code = obtener_cancha_por_id(datos_reserva["id_cancha"])
+    if code == 404:
+        return construir_error(
+                    code="ERROR_NO_ENCONTRADO",
+                    mesagge="Recurso no encontrado",
+                    description= f"La cancha de id '{datos_reserva["id_cancha"]}' no existe "
+        )
 
-    # Verifica que no exista otra reserva en el mismo horario
+    
+    # Verifca que el socio exista
+    mensaje_socio,estado = obtener(datos_reserva["id_socio"])
+    if estado == 404:
+        return construir_error(
+                code="ERROR_NO_ENCONTRADO",
+                mesagge="Recurso no encontrado",
+                description= f"El socio de id '{datos_reserva["id_socio"]}' no existe "
+        )
+    socio_activo = entidad_activa("socios",datos_reserva["id_socio"],"activo")
+    if not socio_activo:
+        return construir_error(
+            code="ERROR_CONFLICTO",
+            mesagge="Conflicto en la reserva",
+            description=f"El socio de id '{datos_reserva["id_socio"]}' se encuentra inactivo"
+        )
+
+    
+    # Verifica que la cancha se encuentre disponible
+    cancha_activa = entidad_activa("canchas",datos_reserva["id_cancha"],"activa")
+    if not cancha_activa:
+        return construir_error(
+            code="ERROR_CONFLICTO",
+            mesagge="Conflicto en la reserva",
+            description=f"La cancha de id '{datos_reserva["id_cancha"]}' se encuentra inactiva"
+        )
+
     superposicion = hay_superposicion_reserva(datos_reserva)
 
+
+    # Verifica que no exista otra reserva en el mismo horario
     if superposicion:
-        return jsonify({"error": "Ya existe reserva entre esas horas"}), 409
-
-    agregar_reserva(datos_reserva)
-    return '', 201
-
-
-def actualizar_estado_reserva(id: int,estado):
-    reserva_id = obtener_reserva_id(id)
-    if reserva_id is None:
-        return jsonify({"error": f"reserva de id {id} no existe"}),404
-    actualizar_estado(id, estado)
-    return '',204
+        return construir_error(
+                    code="ERROR_CONFLICTO",
+                    mesagge="Conflicto en la reserva",
+                    description=f"Ya hay una reserva entre el intervalo de las horas"
+        )
+    # Si todo sale bien, registra la reserva en la base de datos
+    insertar_reserva(datos_reserva)
