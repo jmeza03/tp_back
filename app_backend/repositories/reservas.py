@@ -45,7 +45,7 @@ def comparador(sql, parametros, condicion, valor):
     return sql
 
 
-def agregar_reserva(datos):
+def insertar_reserva(datos):
     # Inserta la reserva usando los nombres de columnas actuales de la base.
     # Luego habrá que ajustar estos campos si el contrato exige otros nombres o formato.
     sql = """
@@ -80,12 +80,12 @@ def precio_hora_cancha(id_cancha): #conseguir el precio x hora de la cancha por 
 def precio_xhora(fecha_hora_in,fecha_hora_fin): #calcular cantidad horas de la nueva reserva
     return (datetime.fromisoformat(fecha_hora_fin) - datetime.fromisoformat(fecha_hora_in)).total_seconds() / 3600
 
-def actualizar_estado(id_reserva, estado):
-    sql = "UPDATE reservas SET estado = %s WHERE id = %s"
-    parametros = [estado["estado"], id_reserva]
-    return execute(sql,parametros)
-
 def hay_superposicion_reserva(datos): #ver si hay una reserva en las horas dadas
     sql = "SELECT EXISTS ( SELECT 1 FROM reservas WHERE id_cancha = %s AND fecha_hora_inicio < %s AND fecha_hora_fin > %s) AS existe_superposicion"
     parametros = [datos["id_cancha"],datos["fecha_hora_fin"],datos["fecha_hora_inicio"]]
     return bool(query_one(sql,parametros)["existe_superposicion"])
+
+def entidad_activa(tabla, id, campo):
+    sql = f"SELECT {campo} AS esta_activa FROM {tabla} WHERE id = %s"
+    parametros = [id]
+    return bool(query_one(sql,parametros)["esta_activa"])
