@@ -1,7 +1,13 @@
 from flask import Blueprint,jsonify, request
 # Importa la logica de reservas desde los modulos locales
-from services.reservas import registar_reserva, listar_reservas, listar_reserva_id
+from services.reservas import registrar_reserva, listar_reservas, listar_reserva_id
 from repositories.reservas import contador_reservas
+from validators.reserva_validator import validar_datos_reserva_nueva,validar_id,construir_error
+from constants import (
+    PAGINACION_LIMIT_POR_DEFECTO,
+    PAGINACION_LIMIT_MAXIMO,
+    PAGINACION_OFFSET_POR_DEFECTO,
+    )
 reservas_bp=Blueprint('reservas',__name__)
 
 @reservas_bp.route('/reservas', methods=['GET'])
@@ -12,11 +18,18 @@ def lista_reservas():
     fecha_desde = request.args.get("fecha_desde")
     fecha_hasta = request.args.get("fecha_hasta")
     
-    #falta validaciones de los request
 
-    limit = request.args.get("_limit",10, type=int)
-    offset = request.args.get("_offset",0,type=int)
+    limit = request.args.get("_limit",PAGINACION_LIMIT_POR_DEFECTO, type=int)
+    offset = request.args.get("_offset",PAGINACION_OFFSET_POR_DEFECTO,type=int)
+    if limit < 1 or limit > PAGINACION_LIMIT_MAXIMO:
+        return jsonify({
+            "error": "_limit debe estar entre 1 y 100"
+        }), 400
 
+    if offset < 0:
+        return jsonify({
+            "error": "_offset no puede ser negativo"
+        }), 400
 
     total = contador_reservas()[0]["total"]
     offset_prev = max(0, offset - limit)
@@ -41,19 +54,39 @@ def lista_reservas():
     resultado = {"reservas": reserva, "links": links}
     return jsonify(resultado), 200
 
+
+
+
+
 @reservas_bp.route('/reservas/<id>', methods=['GET'])
 def listar_reservas_id(id):
-    #validar(id) validar que el id sea un int
+    resultado = validar_id(id)
+    if resultado:
+        return jsonify(resultado),400
     reserva = listar_reserva_id(id)
-    if reserva is None:
-        return jsonify({"error": f"reserva de id {id} no existe"}),404
+    if not reserva:
+        mensaje = construir_error(
+            code="ERROR_NO_ENCONTRADO",
+            mesagge="EL CUERPO DE LA SOLICITUD NO EXISTE",
+            description=f"No existe una reserva con id : {id}"
+        )
+        return jsonify(mensaje),404
     return jsonify(reserva),200
+
+
+
 
 @reservas_bp.route('/reservas/', methods=['POST'])
 def agregar_reserva():
-    datos_reserva = request.get_json()
-
-    #validar_datos_reserva(datos_reserva) --> valida si los datos son correctos
-    #validar_campo_oblicatorio(datos_reserva) --> desde validators valida si los campos estan
-
-    return registar_reserva(datos_reserva)
+    datos_reserva = request.get_json(silent=True)
+    if not isinstance(datos_reserva, dict):
+          return jsonify({"error": "El cuerpo de la solicitud debe ser un JSON valido"}), 400
+    # Validar que los datos sean correctos (Campos obligatorios, int, formato y que no este vacio)
+    mensaje = validar_datos_reserva_nueva(datos_reserva)
+    if mensaje:
+        return jsonify(mensaje),400
+    # Validar la existencia de canchas, socios, ademas de que no haya superposicion
+    resultado = registrar_reserva(datos_reserva)
+    if resultado:
+        return jsonify(resultado),409
+    return '',201

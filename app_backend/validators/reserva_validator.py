@@ -8,6 +8,96 @@ from constants import (
     DURACION_MINIMA_RESERVA_HORAS,
     DURACION_MAXIMA_RESERVA_HORAS
 )
+def construir_error(code: str, mesagge: str , description: str , level: str = "error")-> dict:
+    return {"errors":[{
+        "code": code,
+        "message":mesagge,
+        "level":level,
+        "description": description
+    }        
+    ]}
+
+
+
+
+
+
+
+
+def validar_datos_reserva_nueva(datos):
+    #validar si el campo existe en el request
+    campos_obligatorios = ["id_socio","id_cancha","fecha_hora_inicio","fecha_hora_fin"]
+    for i in campos_obligatorios:
+        if i not in datos:
+            return construir_error(
+                code="ERROR_VALIDACION",
+                mesagge="Un campo esta vacio",
+                description=f"El campo '{i}' es obligatorio"
+            )
+
+
+    #validar si el campo esta vacio
+    if not datos["id_socio"]:
+        return construir_error(
+            code="ERROR_VALIDACION",
+            mesagge="Un valor del campo esta vacio",
+            description=f"El valor del campo {campos_obligatorios[0]} no puede estar vacio"
+        )
+    elif not datos["id_cancha"]:
+            return construir_error(
+                code="VALOR_VACIO",
+                mesagge="Un valor del campo esta vacio",
+                description=f"El valor del campo {campos_obligatorios[1]} no puede estar vacio"
+            )
+    elif not datos["fecha_hora_inicio"]:
+            return construir_error(
+                code="ERROR_VALIDACION",
+                mesagge="Un valor del campo esta vacio",
+                description=f"El valor del campo {campos_obligatorios[2]} no puede estar vacio"
+            )
+    elif not datos["fecha_hora_fin"]:
+            return construir_error(
+                code="ERROR_VALIDACION",
+                mesagge="Un valor del campo esta vacio",
+                description=f"El valor del campo {campos_obligatorios[3]} no puede estar vacio"
+            )
+
+
+    #validar que sean del valor correcto
+    mensaje_in,resultado_in = validar_datetime(datos["fecha_hora_inicio"])
+    mensaje_fin,resultado_fin = validar_datetime(datos["fecha_hora_fin"])
+    mensaje_socio = validar_id(datos["id_socio"])
+    mensaje_cancha = validar_id(datos["id_cancha"])
+    
+    if not resultado_in:        
+        return mensaje_in
+    
+    elif not resultado_fin:
+        return mensaje_fin
+    
+    elif mensaje_socio:
+        return mensaje_socio
+    
+    elif mensaje_cancha:
+        return mensaje_cancha
+    
+    elif resultado_in and resultado_fin:
+            #validar que el datetime sea correcto
+            bool,error_mensaje = validar_nueva_reserva(datetime.fromisoformat(datos["fecha_hora_inicio"]),datetime.fromisoformat(datos["fecha_hora_fin"]))
+            
+            if not bool:
+                return {"error": error_mensaje}
+#validacion del id 
+def validar_id(id):
+    mensaje,resultado = validar_entero(id)
+    if not resultado:
+        return mensaje
+    if int(id) < 0:
+        return construir_error(
+            code="ERROR_VALIDACION",
+            mesagge="EL CUERPO DE LA SOLICITUD ES INVALIDO",
+            description=f"El valor '{id}' tiene que ser positivo"
+        )
 
 def validar_nueva_reserva(fecha_hora_inicio: datetime, fecha_hora_fin: datetime):
 
@@ -49,3 +139,29 @@ def validar_nueva_reserva(fecha_hora_inicio: datetime, fecha_hora_fin: datetime)
         return False, f"La reserva debe durar obligatoriamente entre {int(DURACION_MINIMA_RESERVA_HORAS)} y {int(DURACION_MAXIMA_RESERVA_HORAS)} horas completas."
 
     return True, ""
+
+
+
+
+def validar_entero(numero):
+    valor = str(numero)
+    try:
+        valor = int(valor)
+        return '',True
+    except ValueError:
+        return construir_error(
+            code=f"ERROR_VALIDACION",
+            mesagge=f"EL CUERPO DE LA SOLICITUD ES INVALIDO",
+            description=f"El valor '{numero}' no es un entero"
+            ),False
+
+def validar_datetime(valor):
+    try:
+        valor = datetime.fromisoformat(valor)
+        return '',True
+    except ValueError:
+        return construir_error(
+            code=f"ERROR_VALIDACION",
+            mesagge=f"EL CUERPO DE LA SOLICITUD ES INVALIDO",
+            description=f"El valor '{valor}' no es un formato de datetime"
+            ),False
