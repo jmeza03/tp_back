@@ -1,13 +1,13 @@
 import re
+from urllib.parse import urlencode
 from flask import Blueprint,request, jsonify
 from db import execute, query_all, query_one
-# Usa las constantes de paginación definidas en constants.py
 from constants import PAGINACION_LIMIT_POR_DEFECTO, PAGINACION_LIMIT_MAXIMO
 
 socios_bp = Blueprint("socios", __name__)
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
-def  _error(estado, mensaje):
+def _error(estado, mensaje):
     return jsonify({
         "errors": [{
             "code": "ERROR_VALIDACION",
@@ -15,7 +15,7 @@ def  _error(estado, mensaje):
             "level": "error",
             "description": mensaje,
         }]
-    }),  estado
+    }), estado
 
 def _fila_a_json(fila):
     return {
@@ -29,23 +29,32 @@ def _fila_a_json(fila):
 # GET /socios
 @socios_bp.get("/socios")
 def listar():
+    parametros_permitidos = {"_limit", "_offset", "nombre", "activo"}
+
+    if set(request.args.keys()) - parametros_permitidos:
+        return _error(400, "Se enviaron parámetros no permitidos.")
+
     try:
-        limite = int(request.args.get("_limit", 10))
+        limite = int(request.args.get("_limit", PAGINACION_LIMIT_POR_DEFECTO))
         desplazamiento = int(request.args.get("_offset", 0))
     except ValueError:
         return _error(400, "Los parámetros '_limit' y '_offset' deben ser enteros.")
-    if not (1 <= limite <= 100):
+
+    if not (1 <= limite <= PAGINACION_LIMIT_MAXIMO):
         return _error(400, "El parámetro '_limit' debe estar entre 1 y 100.")
+
     if desplazamiento < 0:
         return _error(400, "El parámetro '_offset' no puede ser negativo.")
 
     filtros,parametros = [], []
     nombre = request.args.get("nombre")
-    if nombre:
-        filtros.append("nombre LIKE %s")
+
+    if nombre is not None:
+        filtros.append("LOWER(nombre) LIKE LOWER(%s)")
         parametros.append(f"%{nombre}%")
 
     activo = request.args.get("activo")
+
     if activo is not None:
         if activo not in ("true", "false"):
             return _error(400, "El parámetro 'activo' debe ser 'true' o 'false'.")
@@ -57,7 +66,7 @@ def listar():
     total = query_one(
         f"SELECT COUNT(*) as total FROM socios {clausula_where}", parametros
     )["total"]
-    
+
     filas = query_all(
         f"SELECT id, nombre, email, activo FROM socios {clausula_where} "
         f"ORDER BY id ASC LIMIT %s OFFSET %s",
@@ -66,52 +75,61 @@ def listar():
 
     socios = [_fila_a_json(fila) for fila in filas]
 
-    url_base = request.base_url
+    ultimo_desplazamiento = (
+        max(0,((total - 1) // limite )* limite) if total > 0 else 0
+    )
 
     def _link(nuevo_desplazamiento):
         consulta = dict(request.args.to_dict())
         consulta["_limit"] = limite
         consulta["_offset"] = nuevo_desplazamiento
-        url = f"{url_base}?" + "&".join(f"{k}={v}" for k, v in consulta.items())
+        url = f"{request.base_url}?" + urlencode(consulta)
         return {"href": url}
-        
-    ultimo_desplazamiento = (
-        max(0,((total - 1) // limite )* limite) if total > 0 else 0
-    )
 
     enlaces = {
         "_first": _link(0),
         "_prev": _link(max(0, desplazamiento - limite)) if desplazamiento > 0 else None,
         "_next": _link(desplazamiento + limite) if desplazamiento + limite < total else None,
-        "_last": _link(ultimo_desplazamiento) 
+        "_last": _link(ultimo_desplazamiento)
     }
-    return jsonify({ "socios": socios, "_links": enlaces}), 200
+
+    return jsonify({"socios": socios, "_links": enlaces}), 200
 
 
 # POST /socios
 @socios_bp.post("/socios")
 def crear():
     datos = request.get_json(silent=True)
-    if not datos or not isinstance(datos, dict):
+
+    if not isinstance(datos, dict):
         return _error(400, "El cuerpo de la solicitud debe ser un JSON válido.")
+
     if set(datos.keys()) - {"nombre", "email"}:
         return _error(400, "El cuerpo contiene campos no permitidos. Solo se permiten 'nombre' y 'email'.")
 
     if "nombre" not in datos:
         return _error(400, "El campo 'nombre' es obligatorio.")
+
     nombre = datos["nombre"]
+
     if not isinstance(nombre, str) or not nombre.strip():
         return _error(400, "El campo 'nombre' debe ser una cadena no vacía.")
+
     nombre = nombre.strip()
 
     if "email" not in datos:
         return _error(400, "El campo 'email' es obligatorio.")
+
     email = datos["email"]
+
     if not isinstance(email, str):
         return _error(400, "El campo 'email' debe ser texto.")
+
     email = email.strip().lower()
+
     if not EMAIL_RE.match(email):
         return _error(400, "El campo 'email' no es válido.")
+
     if query_one("SELECT id FROM socios WHERE email = %s", [email]):
         return _error(409, "El correo electrónico ya está registrado.")
 
@@ -120,33 +138,46 @@ def crear():
         [nombre, email]
     )
 
-
     socio_creado = query_one(
         "SELECT id, nombre, email, activo FROM socios WHERE id = %s", [nuevo_id]
     )
+
     return jsonify(_fila_a_json(socio_creado)), 201
 
 
 # GET /socios/<id>
 @socios_bp.get("/socios/<int:id>")
 def obtener(id):
+    if id <= 0:
+        return _error(404, "Socio no encontrado.")
+
     fila = query_one(
         "SELECT id, nombre, email, activo FROM socios WHERE id = %s", [id]
     )
+
     if not fila:
         return _error(404, "Socio no encontrado.")
+
     return jsonify(_fila_a_json(fila)), 200
 
 
 # PATCH /socios/<id>
 @socios_bp.patch("/socios/<int:id>")
 def actualizar(id):
+    if id <= 0:
+        return _error(404, "Socio no encontrado.")
+
     if not query_one("SELECT id FROM socios WHERE id = %s", [id]):
         return _error(404, "Socio no encontrado.")
 
     datos = request.get_json(silent=True)
-    if not datos or not isinstance(datos, dict):
+
+    if not isinstance(datos, dict):
         return _error(400, "El cuerpo de la solicitud debe ser un JSON válido.")
+
+    if not datos:
+        return _error(400, "No se proporcionaron campos para actualizar.")
+
     if set(datos.keys()) - {"nombre", "email", "activo"}:
         return _error(400, "El cuerpo de la solicitud contiene campos no permitidos.")
 
@@ -155,25 +186,31 @@ def actualizar(id):
     if "nombre" in datos:
         if not isinstance(datos["nombre"], str) or not datos["nombre"].strip():
             return _error(400, "El campo 'nombre' debe ser una cadena no vacía.")
+
         campos.append("nombre = %s")
         valores.append(datos["nombre"].strip())
 
     if "email" in datos:
-        if not isinstance(datos["email"],str):
-            return _error(400, "El campo 'email' debe ser una cadena no vacía.")
+        if not isinstance(datos["email"], str):
+            return _error(400, "El campo 'email' debe ser una cadena.")
+
         email = datos["email"].strip().lower()
+
         if not EMAIL_RE.match(email):
             return _error(400, "El campo 'email' debe ser un correo electrónico válido.")
+
         if query_one(
             "SELECT id FROM socios WHERE email = %s AND id != %s", [email, id]
         ):
             return _error(409, "El correo electrónico ya está registrado por otro socio.")
+
         campos.append("email = %s")
         valores.append(email)
 
     if "activo" in datos:
         if not isinstance(datos["activo"], bool):
             return _error(400, "El campo 'activo' debe ser un valor booleano.")
+
         campos.append("activo = %s")
         valores.append(datos["activo"])
 
@@ -181,11 +218,12 @@ def actualizar(id):
         return _error(400, "No se proporcionaron campos para actualizar.")
 
     execute(
-        f"UPDATE socios SET {', '.join(campos)} WHERE id = %s", 
+        f"UPDATE socios SET {', '.join(campos)} WHERE id = %s",
         valores + [id]
     )
 
     actualizado = query_one(
         "SELECT id, nombre, email, activo FROM socios WHERE id = %s", [id]
     )
+
     return jsonify(_fila_a_json(actualizado)), 200
